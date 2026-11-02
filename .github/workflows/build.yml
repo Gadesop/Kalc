@@ -1,5 +1,5 @@
 
-name: Build KALC
+name: Build KALC 4.0
 
 on:
   workflow_dispatch:
@@ -11,17 +11,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
@@ -73,8 +70,8 @@ jobs:
                   applicationId = "com.kuro.calculator"
                   minSdk = 23
                   targetSdk = 35
-                  versionCode = 2
-                  versionName = "2.0"
+                  versionCode = 4
+                  versionName = "4.0"
               }
 
               compileOptions {
@@ -125,30 +122,37 @@ jobs:
           import androidx.compose.foundation.background
           import androidx.compose.foundation.clickable
           import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.lazy.LazyColumn
+          import androidx.compose.foundation.lazy.items
+          import androidx.compose.foundation.shape.CircleShape
           import androidx.compose.foundation.shape.RoundedCornerShape
           import androidx.compose.material3.*
           import androidx.compose.runtime.*
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.blur
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.Brush
           import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.text.style.TextAlign
+          import androidx.compose.ui.text.style.TextOverflow
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
           import java.util.Locale
 
-          private val Background = Color(0xFF090A0F)
-          private val Panel = Color(0xFF171820)
-          private val NumberKey = Color(0xFF20212B)
-          private val Accent = Color(0xFFB8A4FF)
-          private val White = Color(0xFFF5F3FC)
-          private val Muted = Color(0xFF858493)
+          private val Bg = Color(0xFF08070D)
+          private val Glass = Color(0x24FFFFFF)
+          private val Border = Color(0x35FFFFFF)
+          private val Violet = Color(0xFFCCB8FF)
+          private val TextMain = Color(0xFFF8F5FF)
+          private val TextMuted = Color(0xFF9A91AA)
 
           class MainActivity : ComponentActivity() {
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  window.statusBarColor = android.graphics.Color.rgb(9, 10, 15)
-                  window.navigationBarColor = android.graphics.Color.rgb(9, 10, 15)
+                  window.statusBarColor = android.graphics.Color.rgb(8, 7, 13)
+                  window.navigationBarColor = android.graphics.Color.rgb(8, 7, 13)
                   setContent { KalcApp() }
               }
           }
@@ -160,6 +164,8 @@ jobs:
               var operator by remember { mutableStateOf("") }
               var fresh by remember { mutableStateOf(false) }
               var expression by remember { mutableStateOf("") }
+              var history by remember { mutableStateOf(listOf<String>()) }
+              var showHistory by remember { mutableStateOf(false) }
 
               fun press(key: String) {
                   when (key) {
@@ -170,9 +176,11 @@ jobs:
                           expression = ""
                           fresh = false
                       }
-                      "⌫" -> {
-                          if (!fresh) display =
-                              if (display.length > 1) display.dropLast(1) else "0"
+                      "DEL" -> {
+                          if (!fresh) {
+                              display = if (display.length > 1)
+                                  display.dropLast(1) else "0"
+                          }
                       }
                       "+", "−", "×", "÷" -> {
                           stored = display.toDoubleOrNull()
@@ -191,26 +199,39 @@ jobs:
                                   "÷" -> if (b != 0.0) a / b else null
                                   else -> null
                               }
-                              expression = "$a $operator $b"
+                              val old = "$expression $display"
                               display = result?.let { format(it) } ?: "Error"
+                              if (result != null) {
+                                  history = listOf("$old = $display") +
+                                      history.take(19)
+                              }
+                              expression = old
                               stored = null
                               operator = ""
                               fresh = true
                           }
                       }
-                      "%" -> display = format((display.toDoubleOrNull() ?: 0.0) / 100)
-                      "±" -> display = format(-(display.toDoubleOrNull() ?: 0.0))
+                      "%" -> display = format(
+                          (display.toDoubleOrNull() ?: 0.0) / 100
+                      )
+                      "±" -> display = format(
+                          -(display.toDoubleOrNull() ?: 0.0)
+                      )
                       "." -> {
                           if (fresh) {
                               display = "0."
                               fresh = false
-                          } else if (!display.contains(".")) display += "."
+                          } else if (!display.contains(".")) {
+                              display += "."
+                          }
                       }
                       else -> {
                           if (fresh || display == "0" || display == "Error") {
                               display = key
                               fresh = false
-                          } else if (display.length < 14) display += key
+                          } else if (display.length < 15) {
+                              display += key
+                          }
                       }
                   }
               }
@@ -219,127 +240,351 @@ jobs:
                   listOf("AC", "±", "%", "÷"),
                   listOf("7", "8", "9", "×"),
                   listOf("4", "5", "6", "−"),
-                  listOf("1", "2", "3", "+"),
-                  listOf("⌫", "0", ".", "=")
+                  listOf("1", "2", "3", "+")
               )
 
-              MaterialTheme {
-                  Column(
-                      modifier = Modifier
-                          .fillMaxSize()
-                          .background(Background)
-                          .padding(horizontal = 20.dp, vertical = 18.dp)
-                  ) {
-                      Row(
-                          modifier = Modifier.fillMaxWidth(),
-                          verticalAlignment = Alignment.CenterVertically
+              BoxWithConstraints(
+                  modifier = Modifier
+                      .fillMaxSize()
+                      .background(Bg)
+              ) {
+                  val compact = maxHeight < 700.dp
+
+                  Box(Modifier.fillMaxSize()) {
+                      Box(
+                          Modifier
+                              .offset(x = (-95).dp, y = 80.dp)
+                              .size(250.dp)
+                              .blur(85.dp)
+                              .background(
+                                  Color(0xFF6844A9),
+                                  CircleShape
+                              )
+                      )
+                      Box(
+                          Modifier
+                              .align(Alignment.BottomEnd)
+                              .offset(x = 90.dp, y = (-100).dp)
+                              .size(220.dp)
+                              .blur(75.dp)
+                              .background(
+                                  Color(0xFF343C91),
+                                  CircleShape
+                              )
+                      )
+
+                      Column(
+                          modifier = Modifier
+                              .fillMaxSize()
+                              .padding(
+                                  horizontal = 19.dp,
+                                  vertical = if (compact) 10.dp else 17.dp
+                              )
                       ) {
-                          Column {
-                              Text(
-                                  "KALC",
-                                  color = White,
-                                  fontSize = 25.sp,
-                                  fontWeight = FontWeight.Bold,
-                                  letterSpacing = 5.sp
-                              )
-                              Text(
-                                  "PRECISION, SIMPLIFIED",
-                                  color = Muted,
-                                  fontSize = 9.sp,
-                                  letterSpacing = 2.sp
-                              )
-                          }
-                          Spacer(Modifier.weight(1f))
-                          Text("✦", color = Accent, fontSize = 26.sp)
-                      }
-
-                      Spacer(Modifier.weight(1f))
-
-                      Text(
-                          expression,
-                          modifier = Modifier.fillMaxWidth(),
-                          color = Muted,
-                          fontSize = 18.sp,
-                          textAlign = TextAlign.End
-                      )
-                      Spacer(Modifier.height(12.dp))
-                      Text(
-                          display,
-                          modifier = Modifier.fillMaxWidth(),
-                          color = White,
-                          fontSize = if (display.length > 10) 42.sp else 58.sp,
-                          fontWeight = FontWeight.Light,
-                          textAlign = TextAlign.End,
-                          maxLines = 1
-                      )
-
-                      Spacer(Modifier.height(30.dp))
-
-                      rows.forEach { row ->
                           Row(
-                              modifier = Modifier.fillMaxWidth(),
-                              horizontalArrangement = Arrangement.spacedBy(10.dp)
+                              modifier = Modifier
+                                  .fillMaxWidth()
+                                  .padding(vertical = 10.dp),
+                              verticalAlignment = Alignment.CenterVertically
                           ) {
-                              row.forEach { key ->
-                                  val isAccent = key == "="
-                                  val isOperator = key in listOf("÷", "×", "−", "+")
-                                  val isUtility = key in listOf("AC", "±", "%", "⌫")
+                              Box(
+                                  Modifier
+                                      .size(43.dp)
+                                      .clip(RoundedCornerShape(15.dp))
+                                      .background(
+                                          Brush.linearGradient(
+                                              listOf(
+                                                  Color(0xFFBFA6FF),
+                                                  Color(0xFF64469D)
+                                              )
+                                          )
+                                      ),
+                                  contentAlignment = Alignment.Center
+                              ) {
+                                  Text(
+                                      "K",
+                                      color = Color.White,
+                                      fontSize = 25.sp,
+                                      fontWeight = FontWeight.Bold
+                                  )
+                              }
 
-                                  val bg = when {
-                                      isAccent -> Accent
-                                      isOperator -> Color(0xFF302A42)
-                                      isUtility -> Panel
-                                      else -> NumberKey
-                                  }
-                                  val fg = when {
-                                      isAccent -> Background
-                                      isOperator -> Accent
-                                      isUtility -> Muted
-                                      else -> White
-                                  }
+                              Spacer(Modifier.width(12.dp))
 
-                                  Box(
+                              Column {
+                                  Text(
+                                      "KALC",
+                                      color = TextMain,
+                                      fontSize = 21.sp,
+                                      fontWeight = FontWeight.Bold,
+                                      letterSpacing = 3.sp
+                                  )
+                                  Text(
+                                      "LIQUID GLASS",
+                                      color = TextMuted,
+                                      fontSize = 9.sp,
+                                      letterSpacing = 2.sp
+                                  )
+                              }
+
+                              Spacer(Modifier.weight(1f))
+
+                              GlassPanel(
+                                  modifier = Modifier
+                                      .clip(CircleShape)
+                                      .clickable {
+                                          showHistory = !showHistory
+                                      }
+                                      .padding(
+                                          horizontal = 17.dp,
+                                          vertical = 12.dp
+                                      )
+                              ) {
+                                  Text(
+                                      if (showHistory) "CALCULATOR"
+                                      else "HISTORY",
+                                      color = Violet,
+                                      fontSize = 10.sp,
+                                      fontWeight = FontWeight.Bold
+                                  )
+                              }
+                          }
+
+                          if (showHistory) {
+                              Text(
+                                  "History",
+                                  color = TextMain,
+                                  fontSize = 27.sp,
+                                  fontWeight = FontWeight.SemiBold,
+                                  modifier = Modifier.padding(
+                                      top = 25.dp,
+                                      bottom = 18.dp
+                                  )
+                              )
+                              if (history.isEmpty()) {
+                                  Text(
+                                      "Your calculations will appear here.",
+                                      color = TextMuted
+                                  )
+                              } else {
+                                  LazyColumn(
+                                      modifier = Modifier.weight(1f),
+                                      verticalArrangement =
+                                          Arrangement.spacedBy(10.dp)
+                                  ) {
+                                      items(history) { item ->
+                                          GlassPanel(
+                                              modifier = Modifier
+                                                  .fillMaxWidth()
+                                                  .padding(3.dp)
+                                                  .padding(16.dp)
+                                          ) {
+                                              Text(
+                                                  item,
+                                                  color = TextMain,
+                                                  fontSize = 16.sp
+                                              )
+                                          }
+                                      }
+                                  }
+                                  Text(
+                                      "CLEAR HISTORY",
+                                      color = Violet,
                                       modifier = Modifier
-                                          .weight(1f)
-                                          .height(72.dp)
-                                          .background(bg, RoundedCornerShape(24.dp))
-                                          .clickable { press(key) },
-                                      contentAlignment = Alignment.Center
+                                          .clickable {
+                                              history = emptyList()
+                                          }
+                                          .padding(vertical = 18.dp)
+                                  )
+                              }
+                          } else {
+                              Spacer(Modifier.weight(1f))
+
+                              GlassPanel(
+                                  modifier = Modifier
+                                      .fillMaxWidth()
+                                      .padding(2.dp)
+                                      .padding(
+                                          horizontal = 20.dp,
+                                          vertical = 25.dp
+                                      )
+                              ) {
+                                  Column(
+                                      modifier = Modifier.fillMaxWidth(),
+                                      horizontalAlignment =
+                                          Alignment.End
                                   ) {
                                       Text(
-                                          key,
-                                          color = fg,
-                                          fontSize = if (key.length > 1) 18.sp else 25.sp,
-                                          fontWeight = if (isAccent) FontWeight.Bold
-                                          else FontWeight.Medium
+                                          expression.ifEmpty { " " },
+                                          color = TextMuted,
+                                          fontSize = 17.sp,
+                                          maxLines = 1,
+                                          overflow = TextOverflow.Ellipsis
+                                      )
+                                      Spacer(Modifier.height(12.dp))
+                                      Text(
+                                          display,
+                                          color = TextMain,
+                                          fontSize = if (display.length > 10)
+                                              39.sp else 53.sp,
+                                          fontWeight = FontWeight.Light,
+                                          maxLines = 1
                                       )
                                   }
                               }
-                          }
-                          Spacer(Modifier.height(10.dp))
-                      }
 
-                      Spacer(Modifier.height(8.dp))
-                      Text(
-                          "MADE WITH PRECISION",
-                          modifier = Modifier.fillMaxWidth(),
-                          color = Color(0xFF555461),
-                          fontSize = 9.sp,
-                          letterSpacing = 2.sp,
-                          textAlign = TextAlign.Center
-                      )
+                              Spacer(Modifier.height(23.dp))
+
+                              rows.forEach { row ->
+                                  Row(
+                                      modifier = Modifier.fillMaxWidth(),
+                                      horizontalArrangement =
+                                          Arrangement.spacedBy(10.dp)
+                                  ) {
+                                      row.forEach { key ->
+                                          GlassKey(
+                                              key = key,
+                                              modifier = Modifier.weight(1f),
+                                              onClick = { press(key) }
+                                          )
+                                      }
+                                  }
+                                  Spacer(Modifier.height(10.dp))
+                              }
+
+                              Row(
+                                  modifier = Modifier.fillMaxWidth(),
+                                  horizontalArrangement =
+                                      Arrangement.spacedBy(10.dp)
+                              ) {
+                                  GlassKey(
+                                      "DEL",
+                                      Modifier.weight(1f)
+                                  ) { press("DEL") }
+                                  GlassKey(
+                                      "0",
+                                      Modifier.weight(1f)
+                                  ) { press("0") }
+                                  GlassKey(
+                                      ".",
+                                      Modifier.weight(1f)
+                                  ) { press(".") }
+                                  GlassKey(
+                                      "=",
+                                      Modifier.weight(1f)
+                                  ) { press("=") }
+                              }
+
+                              Spacer(Modifier.weight(0.5f))
+                          }
+                      }
                   }
+              }
+          }
+
+          @Composable
+          fun GlassPanel(
+              modifier: Modifier = Modifier,
+              content: @Composable ColumnScope.() -> Unit
+          ) {
+              Column(
+                  modifier = modifier
+                      .clip(RoundedCornerShape(26.dp))
+                      .background(
+                          Brush.linearGradient(
+                              listOf(
+                                  Color(0x32FFFFFF),
+                                  Color(0x12B9A0FF),
+                                  Color(0x18FFFFFF)
+                              )
+                          )
+                      )
+                      .background(Border),
+                  content = content
+              )
+          }
+
+          @Composable
+          fun GlassKey(
+              key: String,
+              modifier: Modifier = Modifier,
+              onClick: () -> Unit
+          ) {
+              val equal = key == "="
+              val operator = key in listOf("+", "−", "×", "÷")
+              val utility = key in listOf("AC", "±", "%", "DEL")
+
+              val background = when {
+                  equal -> Brush.linearGradient(
+                      listOf(
+                          Color(0xFFE0D0FF),
+                          Color(0xFF9E7BEE),
+                          Color(0xFF7353B4)
+                      )
+                  )
+                  operator -> Brush.linearGradient(
+                      listOf(
+                          Color(0x66A987E8),
+                          Color(0x334C3B6A)
+                      )
+                  )
+                  utility -> Brush.linearGradient(
+                      listOf(
+                          Color(0x38FFFFFF),
+                          Color(0x16FFFFFF)
+                      )
+                  )
+                  else -> Brush.linearGradient(
+                      listOf(
+                          Color(0x30FFFFFF),
+                          Color(0x12FFFFFF)
+                      )
+                  )
+              }
+
+              val foreground = when {
+                  equal -> Color(0xFF21152F)
+                  operator -> Violet
+                  utility -> Color(0xFFC6BDD8)
+                  else -> TextMain
+              }
+
+              Box(
+                  modifier = modifier
+                      .height(67.dp)
+                      .clip(RoundedCornerShape(23.dp))
+                      .background(background)
+                      .clickable { onClick() }
+                      .padding(1.dp)
+                      .background(
+                          Brush.verticalGradient(
+                              listOf(
+                                  Color(0x20FFFFFF),
+                                  Color.Transparent
+                              )
+                          ),
+                          RoundedCornerShape(22.dp)
+                      ),
+                  contentAlignment = Alignment.Center
+              ) {
+                  Text(
+                      if (key == "DEL") "⌫" else key,
+                      color = foreground,
+                      fontSize = if (key.length > 1) 17.sp else 24.sp,
+                      fontWeight = if (equal)
+                          FontWeight.Bold else FontWeight.Medium
+                  )
               }
           }
 
           fun format(value: Double): String {
               if (!value.isFinite()) return "Error"
-              return if (value == value.toLong().toDouble()) {
-                  value.toLong().toString()
-              } else {
-                  String.format(Locale.US, "%.8f", value)
-                      .trimEnd('0').trimEnd('.')
+              if (value == value.toLong().toDouble()) {
+                  return value.toLong().toString()
               }
+              return String.format(Locale.US, "%.8f", value)
+                  .trimEnd('0')
+                  .trimEnd('.')
           }
           EOF
 
@@ -349,5 +594,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: KALC-Premium-APK
+          name: KALC-4-LIQUID-GLASS
           path: app/build/outputs/apk/debug/app-debug.apk
