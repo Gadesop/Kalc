@@ -188,6 +188,16 @@ jobs:
               var history by remember { mutableStateOf(listOf<String>()) }
               var showHistory by remember { mutableStateOf(false) }
 
+              fun computeResult(a: Double, b: Double, op: String): Double? {
+                  return when (op) {
+                      "+" -> a + b
+                      "−" -> a - b
+                      "×" -> a * b
+                      "÷" -> if (b != 0.0) a / b else null
+                      else -> null
+                  }
+              }
+
               fun press(key: String) {
                   when (key) {
                       "AC" -> {
@@ -203,7 +213,19 @@ jobs:
                           }
                       }
                       "+", "−", "×", "÷" -> {
-                          stored = display.toDoubleOrNull()
+                          val currentVal = display.toDoubleOrNull()
+                          if (stored != null && operator.isNotEmpty() && !fresh && currentVal != null) {
+                              val prevResult = computeResult(stored!!, currentVal, operator)
+                              if (prevResult != null) {
+                                  display = format(prevResult)
+                                  stored = prevResult
+                              } else {
+                                  display = "Error"
+                                  stored = null
+                              }
+                          } else {
+                              stored = currentVal
+                          }
                           operator = key
                           expression = "$display $key"
                           fresh = true
@@ -211,14 +233,8 @@ jobs:
                       "=" -> {
                           val a = stored
                           val b = display.toDoubleOrNull()
-                          if (a != null && b != null) {
-                              val result = when (operator) {
-                                  "+" -> a + b
-                                  "−" -> a - b
-                                  "×" -> a * b
-                                  "÷" -> if (b != 0.0) a / b else null
-                                  else -> null
-                              }
+                          if (a != null && b != null && operator.isNotEmpty()) {
+                              val result = computeResult(a, b, operator)
                               val old = "$expression $display"
                               display = result?.let { format(it) } ?: "Error"
                               if (result != null) {
