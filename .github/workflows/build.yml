@@ -1,4 +1,4 @@
-Name: Build KALC 5.0
+name: Build KALC 5.0
 
 on:
   workflow_dispatch:
@@ -25,7 +25,7 @@ jobs:
         run: |
           mkdir -p app/src/main/java/com/kuro/calculator
 
-          cat > settings.gradle.kts <<'EOF'
+          cat << 'EOF' > settings.gradle.kts
           pluginManagement {
               repositories {
                   google()
@@ -44,7 +44,7 @@ jobs:
           include(":app")
           EOF
 
-          cat > build.gradle.kts <<'EOF'
+          cat << 'EOF' > build.gradle.kts
           plugins {
               id("com.android.application") version "8.7.3" apply false
               id("org.jetbrains.kotlin.android") version "2.0.21" apply false
@@ -54,7 +54,7 @@ jobs:
 
           echo "android.useAndroidX=true" > gradle.properties
 
-          cat > app/build.gradle.kts <<'EOF'
+          cat << 'EOF' > app/build.gradle.kts
           plugins {
               id("com.android.application")
               id("org.jetbrains.kotlin.android")
@@ -94,7 +94,7 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
                   android:theme="@android:style/Theme.Material.Light.NoActionBar"
@@ -112,7 +112,7 @@ jobs:
           </manifest>
           EOF
 
-          cat > app/src/main/java/com/kuro/calculator/MainActivity.kt <<'EOF'
+          cat << 'EOF' > app/src/main/java/com/kuro/calculator/MainActivity.kt
           package com.kuro.calculator
 
           import android.os.Bundle
@@ -240,11 +240,9 @@ jobs:
                       .fillMaxSize()
                       .background(BgBase)
               ) {
-                  // Background Neon Liquid Glow Orbs (Properly contained & layered)
                   Box(
                       modifier = Modifier
                           .fillMaxSize()
-                          .zIndex(0f)
                   ) {
                       Box(
                           Modifier
@@ -264,16 +262,13 @@ jobs:
                       )
                   }
 
-                  // Foreground UI Content
                   Column(
                       modifier = Modifier
                           .fillMaxSize()
-                          .zIndex(1f)
                           .statusBarsPadding()
                           .navigationBarsPadding()
                           .padding(horizontal = 20.dp, vertical = 12.dp)
                   ) {
-                      // Header
                       Row(
                           modifier = Modifier
                               .fillMaxWidth()
@@ -324,7 +319,7 @@ jobs:
                               modifier = Modifier.height(38.dp)
                           ) {
                               Text(
-                                  if (showHistory = showHistory) "CALC" else "HISTORY",
+                                  if (showHistory) "CALC" else "HISTORY",
                                   color = NeonViolet,
                                   fontSize = 11.sp,
                                   fontWeight = FontWeight.Bold,
@@ -376,7 +371,6 @@ jobs:
                               }
                           }
                       } else {
-                          // Calculator Display Card
                           GlassPanel(
                               modifier = Modifier
                                   .fillMaxWidth()
@@ -410,7 +404,6 @@ jobs:
 
                           Spacer(Modifier.height(16.dp))
 
-                          // Keypad Grid
                           Column(
                               modifier = Modifier
                                   .fillMaxWidth()
