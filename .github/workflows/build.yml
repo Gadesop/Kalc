@@ -113,7 +113,6 @@ jobs:
           </manifest>
           EOF
 
-          # Create a generative vector drawable representation of the purple swirly pattern to guarantee seamless offline build without external asset fetch drops
           cat << 'EOF' > app/src/main/res/drawable/bg_pattern.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="400dp"
@@ -153,6 +152,7 @@ jobs:
           import androidx.compose.runtime.*
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.alpha
           import androidx.compose.ui.draw.clip
           import androidx.compose.ui.graphics.Brush
           import androidx.compose.ui.graphics.Color
@@ -263,7 +263,6 @@ jobs:
                       .fillMaxSize()
                       .background(BgBase)
               ) {
-                  // Low Opacity Custom Swirly Background Wallpaper
                   Image(
                       painter = painterResource(id = R.drawable.bg_pattern),
                       contentDescription = null,
@@ -273,7 +272,6 @@ jobs:
                       contentScale = ContentScale.Crop
                   )
 
-                  // Foreground UI Content
                   Column(
                       modifier = Modifier
                           .fillMaxSize()
