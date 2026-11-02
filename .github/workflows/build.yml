@@ -24,6 +24,7 @@ jobs:
       - name: Create Android project
         run: |
           mkdir -p app/src/main/java/com/kuro/calculator
+          mkdir -p app/src/main/res/drawable
 
           cat << 'EOF' > settings.gradle.kts
           pluginManagement {
@@ -112,45 +113,67 @@ jobs:
           </manifest>
           EOF
 
+          # Create a generative vector drawable representation of the purple swirly pattern to guarantee seamless offline build without external asset fetch drops
+          cat << 'EOF' > app/src/main/res/drawable/bg_pattern.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="400dp"
+              android:height="800dp"
+              android:viewportWidth="400"
+              android:viewportHeight="800">
+              <path
+                  android:fillColor="#B185F5"
+                  android:pathData="M0,0h400v800H0z"/>
+              <path
+                  android:fillColor="#D8BEFF"
+                  android:pathData="M0,0c100,50 150,150 100,250s-100,100 -50,200 150,150 100,350H0V0z"/>
+              <path
+                  android:fillColor="#9C6CE8"
+                  android:pathData="M400,0c-80,100 -120,200 -70,350s120,150 70,300V0z"/>
+              <path
+                  android:fillColor="#C4A1FF"
+                  android:pathData="M150,0c50,100 -50,250 50,400s150,200 100,400H50V0h100z"/>
+          </vector>
+          EOF
+
           cat << 'EOF' > app/src/main/java/com/kuro/calculator/MainActivity.kt
           package com.kuro.calculator
 
           import android.os.Bundle
           import androidx.activity.ComponentActivity
           import androidx.activity.compose.setContent
+          import androidx.compose.foundation.Image
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
           import androidx.compose.foundation.clickable
           import androidx.compose.foundation.layout.*
           import androidx.compose.foundation.lazy.LazyColumn
           import androidx.compose.foundation.lazy.items
-          import androidx.compose.foundation.shape.CircleShape
           import androidx.compose.foundation.shape.RoundedCornerShape
           import androidx.compose.material3.*
           import androidx.compose.runtime.*
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
-          import androidx.compose.ui.draw.blur
           import androidx.compose.ui.draw.clip
           import androidx.compose.ui.graphics.Brush
           import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.layout.ContentScale
+          import androidx.compose.ui.res.painterResource
           import androidx.compose.ui.text.font.FontWeight
-          import androidx.compose.ui.text.style.TextAlign
           import androidx.compose.ui.text.style.TextOverflow
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
           import java.util.Locale
 
-          private val BgBase = Color(0xFF040308)
+          private val BgBase = Color(0xFF0A0712)
           private val NeonViolet = Color(0xFFD4BBFF)
           private val TextMain = Color(0xFFFFFFFF)
-          private val TextMuted = Color(0xFF8E84A0)
+          private val TextMuted = Color(0xFF9E92B3)
 
           class MainActivity : ComponentActivity() {
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  window.statusBarColor = android.graphics.Color.rgb(4, 3, 8)
-                  window.navigationBarColor = android.graphics.Color.rgb(4, 3, 8)
+                  window.statusBarColor = android.graphics.Color.rgb(10, 7, 18)
+                  window.navigationBarColor = android.graphics.Color.rgb(10, 7, 18)
                   setContent { KalcApp() }
               }
           }
@@ -240,28 +263,17 @@ jobs:
                       .fillMaxSize()
                       .background(BgBase)
               ) {
-                  Box(
+                  // Low Opacity Custom Swirly Background Wallpaper
+                  Image(
+                      painter = painterResource(id = R.drawable.bg_pattern),
+                      contentDescription = null,
                       modifier = Modifier
                           .fillMaxSize()
-                  ) {
-                      Box(
-                          Modifier
-                              .align(Alignment.TopStart)
-                              .offset(x = (-40).dp, y = (-20).dp)
-                              .size(260.dp)
-                              .blur(90.dp)
-                              .background(Color(0xFF7A45FF).copy(alpha = 0.35f), CircleShape)
-                      )
-                      Box(
-                          Modifier
-                              .align(Alignment.BottomEnd)
-                              .offset(x = 50.dp, y = 50.dp)
-                              .size(280.dp)
-                              .blur(100.dp)
-                              .background(Color(0xFF2E5BFF).copy(alpha = 0.3f), CircleShape)
-                      )
-                  }
+                          .alpha(0.25f),
+                      contentScale = ContentScale.Crop
+                  )
 
+                  // Foreground UI Content
                   Column(
                       modifier = Modifier
                           .fillMaxSize()
