@@ -1,1 +1,363 @@
 
+name: Build Calculator APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Create Android project
+        run: |
+          mkdir -p app/src/main/java/com/kuro/calculator
+          mkdir -p app/src/main
+
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "MyCalculator"
+          include(":app")
+          EOF
+
+          cat > build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+              id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
+          }
+          EOF
+
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+              id("org.jetbrains.kotlin.plugin.compose")
+          }
+
+          android {
+              namespace = "com.kuro.calculator"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.kuro.calculator"
+                  minSdk = 23
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+          }
+
+          dependencies {
+              implementation(platform("androidx.compose:compose-bom:2024.09.03"))
+              implementation("androidx.activity:activity-compose:1.9.2")
+              implementation("androidx.compose.ui:ui")
+              implementation("androidx.compose.ui:ui-tooling-preview")
+              implementation("androidx.compose.material3:material3")
+              implementation("androidx.compose.foundation:foundation")
+              debugImplementation("androidx.compose.ui:ui-tooling")
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:theme="@android:style/Theme.Material.NoActionBar"
+                  android:label="My Calculator"
+                  android:allowBackup="false"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/kuro/calculator/MainActivity.kt <<'EOF'
+          package com.kuro.calculator
+
+          import android.os.Bundle
+          import androidx.activity.ComponentActivity
+          import androidx.activity.compose.setContent
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material3.*
+          import androidx.compose.runtime.*
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.text.style.TextAlign
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+
+          private val Background = Color(0xFF101114)
+          private val NumberKey = Color(0xFF24262B)
+          private val OperatorKey = Color(0xFF303640)
+          private val Accent = Color(0xFFB8C9FF)
+
+          class MainActivity : ComponentActivity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContent {
+                      MaterialTheme(
+                          colorScheme = darkColorScheme(
+                              background = Background,
+                              surface = Background,
+                              primary = Accent
+                          )
+                      ) {
+                          CalculatorScreen()
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          fun CalculatorScreen() {
+              var display by remember { mutableStateOf("0") }
+              var stored by remember { mutableStateOf<Double?>(null) }
+              var operator by remember { mutableStateOf<String?>(null) }
+              var fresh by remember { mutableStateOf(true) }
+
+              fun format(value: Double): String {
+                  if (!value.isFinite()) return "Error"
+                  return if (value == value.toLong().toDouble()) {
+                      value.toLong().toString()
+                  } else {
+                      "%.8f".format(java.util.Locale.US, value)
+                          .trimEnd('0').trimEnd('.')
+                  }
+              }
+
+              fun digit(value: String) {
+                  if (display == "Error" || fresh) {
+                      display = value
+                      fresh = false
+                  } else if (display.length < 15) {
+                      display += value
+                  }
+              }
+
+              fun calculate() {
+                  val left = stored ?: return
+                  val right = display.toDoubleOrNull() ?: return
+                  val result = when (operator) {
+                      "+" -> left + right
+                      "−" -> left - right
+                      "×" -> left * right
+                      "÷" -> if (right == 0.0) Double.NaN else left / right
+                      else -> return
+                  }
+                  display = format(result)
+                  stored = null
+                  operator = null
+                  fresh = true
+              }
+
+              fun chooseOperator(value: String) {
+                  if (display == "Error") return
+                  if (stored != null && !fresh) calculate()
+                  stored = display.toDoubleOrNull()
+                  operator = value
+                  fresh = true
+              }
+
+              fun press(key: String) {
+                  when (key) {
+                      "AC" -> {
+                          display = "0"
+                          stored = null
+                          operator = null
+                          fresh = true
+                      }
+                      "⌫" -> {
+                          if (display != "Error") {
+                              display = if (display.length <= 1) "0"
+                              else display.dropLast(1)
+                          }
+                      }
+                      "+/−" -> {
+                          display = display.toDoubleOrNull()
+                              ?.let { format(-it) } ?: "0"
+                      }
+                      "%" -> {
+                          display = display.toDoubleOrNull()
+                              ?.let { format(it / 100) } ?: "0"
+                          fresh = true
+                      }
+                      "." -> {
+                          if (fresh || display == "Error") {
+                              display = "0."
+                              fresh = false
+                          } else if (!display.contains(".")) {
+                              display += "."
+                          }
+                      }
+                      "=" -> calculate()
+                      "+", "−", "×", "÷" -> chooseOperator(key)
+                      else -> digit(key)
+                  }
+              }
+
+              val rows = listOf(
+                  listOf("AC", "+/−", "%", "÷"),
+                  listOf("7", "8", "9", "×"),
+                  listOf("4", "5", "6", "−"),
+                  listOf("1", "2", "3", "+")
+              )
+
+              Column(
+                  modifier = Modifier
+                      .fillMaxSize()
+                      .background(Background)
+                      .padding(horizontal = 18.dp, vertical = 20.dp),
+                  verticalArrangement = Arrangement.Bottom
+              ) {
+                  Text(
+                      text = "CALCULATOR",
+                      color = Color.Gray,
+                      fontSize = 13.sp,
+                      fontWeight = FontWeight.Medium,
+                      letterSpacing = 3.sp,
+                      modifier = Modifier.padding(bottom = 20.dp)
+                  )
+
+                  Text(
+                      text = if (stored != null && operator != null)
+                          "${format(stored!!)} $operator" else " ",
+                      color = Color.Gray,
+                      fontSize = 20.sp,
+                      modifier = Modifier.fillMaxWidth(),
+                      textAlign = TextAlign.End
+                  )
+
+                  Text(
+                      text = display,
+                      color = Color.White,
+                      fontSize = if (display.length > 10) 42.sp else 58.sp,
+                      fontWeight = FontWeight.Light,
+                      textAlign = TextAlign.End,
+                      maxLines = 1,
+                      modifier = Modifier
+                          .fillMaxWidth()
+                          .padding(top = 8.dp, bottom = 30.dp)
+                  )
+
+                  rows.forEach { row ->
+                      Row(
+                          modifier = Modifier.fillMaxWidth(),
+                          horizontalArrangement = Arrangement.spacedBy(10.dp)
+                      ) {
+                          row.forEach { key ->
+                              CalculatorKey(
+                                  key = key,
+                                  modifier = Modifier.weight(1f),
+                                  onClick = { press(key) }
+                              )
+                          }
+                      }
+                      Spacer(Modifier.height(10.dp))
+                  }
+
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(10.dp)
+                  ) {
+                      CalculatorKey(
+                          key = "0",
+                          modifier = Modifier.weight(2f),
+                          onClick = { press("0") }
+                      )
+                      CalculatorKey(
+                          key = ".",
+                          modifier = Modifier.weight(1f),
+                          onClick = { press(".") }
+                      )
+                      CalculatorKey(
+                          key = "=",
+                          modifier = Modifier.weight(1f),
+                          onClick = { press("=") },
+                          accent = true
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          fun CalculatorKey(
+              key: String,
+              modifier: Modifier = Modifier,
+              onClick: () -> Unit,
+              accent: Boolean = false
+          ) {
+              val background = when {
+                  accent -> Accent
+                  key in listOf("÷", "×", "−", "+") -> OperatorKey
+                  else -> NumberKey
+              }
+
+              val foreground = if (accent) Background else Color.White
+
+              Box(
+                  modifier = modifier
+                      .height(70.dp)
+                      .clip(RoundedCornerShape(22.dp))
+                      .background(background)
+                      .clickable { onClick() },
+                  contentAlignment = Alignment.Center
+              ) {
+                  Text(
+                      text = key,
+                      color = foreground,
+                      fontSize = 23.sp,
+                      fontWeight = FontWeight.Medium
+                  )
+              }
+          }
+          EOF
+
+      - name: Build APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: My-Calculator-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+
