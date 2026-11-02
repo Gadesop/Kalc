@@ -1,5 +1,4 @@
-
-name: Build Calculator APK
+name: Build KALC APK
 
 on:
   workflow_dispatch:
@@ -26,9 +25,9 @@ jobs:
       - name: Create Android project
         run: |
           mkdir -p app/src/main/java/com/kuro/calculator
+
           echo "android.useAndroidX=true" > gradle.properties
-          mkdir -p app/src/main
-          echo "android.useAndroidX=true" > gradle.properties
+
           cat > settings.gradle.kts <<'EOF'
           pluginManagement {
               repositories {
@@ -44,7 +43,7 @@ jobs:
                   mavenCentral()
               }
           }
-          rootProject.name = "MyCalculator"
+          rootProject.name = "KALC"
           include(":app")
           EOF
 
@@ -56,43 +55,7 @@ jobs:
           }
           EOF
 
-          plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-}
-
-android {
-    namespace = "com.kuro.calculator"
-    compileSdk = 35
-
-    defaultConfig {
-        applicationId = "com.kuro.calculator"
-        minSdk = 23
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-}
-
-dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.09.03"))
-    implementation("androidx.activity:activity-compose:1.9.2")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.foundation:foundation")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-} <<'EOF'
+          cat > app/build.gradle.kts <<'EOF'
           plugins {
               id("com.android.application")
               id("org.jetbrains.kotlin.android")
@@ -109,6 +72,15 @@ dependencies {
                   targetSdk = 35
                   versionCode = 1
                   versionName = "1.0"
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
               }
           }
 
@@ -127,7 +99,7 @@ dependencies {
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
                   android:theme="@android:style/Theme.Material.NoActionBar"
-                  android:label="My Calculator"
+                  android:label="KALC"
                   android:allowBackup="false"
                   android:supportsRtl="true">
                   <activity
@@ -162,6 +134,7 @@ dependencies {
           import androidx.compose.ui.text.style.TextAlign
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
+          import java.util.Locale
 
           private val Background = Color(0xFF101114)
           private val NumberKey = Color(0xFF24262B)
@@ -172,13 +145,7 @@ dependencies {
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContent {
-                      MaterialTheme(
-                          colorScheme = darkColorScheme(
-                              background = Background,
-                              surface = Background,
-                              primary = Accent
-                          )
-                      ) {
+                      MaterialTheme(colorScheme = darkColorScheme()) {
                           CalculatorScreen()
                       }
                   }
@@ -197,7 +164,7 @@ dependencies {
                   return if (value == value.toLong().toDouble()) {
                       value.toLong().toString()
                   } else {
-                      "%.8f".format(java.util.Locale.US, value)
+                      String.format(Locale.US, "%.8f", value)
                           .trimEnd('0').trimEnd('.')
                   }
               }
@@ -283,20 +250,20 @@ dependencies {
                   modifier = Modifier
                       .fillMaxSize()
                       .background(Background)
-                      .padding(horizontal = 18.dp, vertical = 20.dp),
+                      .padding(18.dp),
                   verticalArrangement = Arrangement.Bottom
               ) {
                   Text(
-                      text = "CALCULATOR",
-                      color = Color.Gray,
-                      fontSize = 13.sp,
-                      fontWeight = FontWeight.Medium,
-                      letterSpacing = 3.sp,
+                      "KALC",
+                      color = Accent,
+                      fontSize = 14.sp,
+                      fontWeight = FontWeight.Bold,
+                      letterSpacing = 4.sp,
                       modifier = Modifier.padding(bottom = 20.dp)
                   )
 
                   Text(
-                      text = if (stored != null && operator != null)
+                      if (stored != null && operator != null)
                           "${format(stored!!)} $operator" else " ",
                       color = Color.Gray,
                       fontSize = 20.sp,
@@ -305,7 +272,7 @@ dependencies {
                   )
 
                   Text(
-                      text = display,
+                      display,
                       color = Color.White,
                       fontSize = if (display.length > 10) 42.sp else 58.sp,
                       fontWeight = FontWeight.Light,
@@ -337,19 +304,19 @@ dependencies {
                       horizontalArrangement = Arrangement.spacedBy(10.dp)
                   ) {
                       CalculatorKey(
-                          key = "0",
-                          modifier = Modifier.weight(2f),
-                          onClick = { press("0") }
+                          "0",
+                          Modifier.weight(2f),
+                          { press("0") }
                       )
                       CalculatorKey(
-                          key = ".",
-                          modifier = Modifier.weight(1f),
-                          onClick = { press(".") }
+                          ".",
+                          Modifier.weight(1f),
+                          { press(".") }
                       )
                       CalculatorKey(
-                          key = "=",
-                          modifier = Modifier.weight(1f),
-                          onClick = { press("=") },
+                          "=",
+                          Modifier.weight(1f),
+                          { press("=") },
                           accent = true
                       )
                   }
@@ -369,8 +336,6 @@ dependencies {
                   else -> NumberKey
               }
 
-              val foreground = if (accent) Background else Color.White
-
               Box(
                   modifier = modifier
                       .height(70.dp)
@@ -380,8 +345,8 @@ dependencies {
                   contentAlignment = Alignment.Center
               ) {
                   Text(
-                      text = key,
-                      color = foreground,
+                      key,
+                      color = if (accent) Background else Color.White,
                       fontSize = 23.sp,
                       fontWeight = FontWeight.Medium
                   )
@@ -395,6 +360,6 @@ dependencies {
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: My-Calculator-APK
+          name: KALC-APK
           path: app/build/outputs/apk/debug/app-debug.apk
 
